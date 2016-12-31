@@ -36,7 +36,7 @@ DELIMS = [',', ' ', '|', '\t']
 QUOTE_CHAR = '"'
 
 # Types, ordered from most specific to least specific.
-TYPES = [bool, int, float, str]
+TYPES = [bool, int, float, str, six.text_type]
 
 HEADER = True
 
@@ -184,7 +184,7 @@ def get_default_formatter(type, values, cfg={}):
             nan_str=cfg["nan_string"],
             inf_str=cfg["inf_string"])
 
-    elif type is str:
+    elif type in (str, six.text_type):
         width = np.vectorize(len)(np.vectorize(str)(values)).max()
         str_width_min = int(cfg["str_width_min"])
         str_width_max = int(cfg["str_width_max"])
@@ -202,6 +202,16 @@ def get_default_formatter(type, values, cfg={}):
         raise NotImplementedError("type: {}".format(type))
         
 
+if six.PY3:
+    csv_reader = csv.reader
+
+else:
+    def csv_reader(lines, **kwargs):
+        encoded_lines = ( l.encode("utf-8") for l in lines )
+        csv_reader = csv.reader(encoded_lines, **kwargs)
+        return ( [ x.decode("utf-8") for x in row ] for row in csv_reader )
+
+
 def guess_delimiter(lines, delims=None):
     """
     Guesses the delimiter for lines of delimited data.
@@ -213,7 +223,7 @@ def guess_delimiter(lines, delims=None):
 
     def get_count(delim):
         # Read lines as delimited.
-        rows = csv.reader(lines, delimiter=delim, quotechar='"')
+        rows = csv_reader(lines, delimiter=delim, quotechar='"')
         # Return the row length, as long as all are the same.
         count = len(next(rows))
         return count if all( len(r) == count for r in rows ) else 0
@@ -287,13 +297,13 @@ class DelimitedFileModel:
             delim = guess_delimiter(sample_lines)
 
         # Now that we have a delimiter, sanitize the sample rows.
-        sample_rows = csv.reader(
+        sample_rows = csv_reader(
             sample_lines, delimiter=delim, quotechar=QUOTE_CHAR)
         self.__rows = [ self.clean_row(r) for r in sample_rows ]
 
         # Set up to read additional rows.
         more_lines = ( l for l in lines if not self.__is_comment(l) )
-        more_rows = csv.reader(
+        more_rows = csv_reader(
             more_lines, delimiter=delim, quotechar=QUOTE_CHAR)
         self.__more_rows = ( self.clean_row(r) for r in more_rows )
 

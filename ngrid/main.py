@@ -1,5 +1,6 @@
 from   __future__ import absolute_import
 
+import codecs
 from   contextlib import closing
 import locale
 import optparse
@@ -61,7 +62,7 @@ def main():
         filename = "(stdin)"
     else:
         filename = args[0]
-        file = open(filename)
+        file = codecs.open(filename, encoding="utf-8-sig")
 
     with closing(file):
         if options.dataframe:
